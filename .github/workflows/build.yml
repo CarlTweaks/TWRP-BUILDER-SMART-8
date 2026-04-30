@@ -1,0 +1,46 @@
+name: Build TWRP for Smart 8
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04 # Mas stable para sa luma/minimal manifest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Build Environment
+        run: |
+          sudo apt update
+          sudo apt install git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 libncurses5 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig -y
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          echo "PATH=$HOME/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Sync TWRP Source
+        run: |
+          mkdir twrp && cd twrp
+          git config --global user.email "gar@example.com"
+          git config --global user.name "Gar"
+          ~/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1
+          ~/bin/repo sync -j$(nproc)
+
+      - name: Clone Device Tree
+        run: |
+          cd twrp
+          git clone https://github.com/twrpdtgen/android_device_infinix_Infinix-X6525 device/infinix/Infinix-X6525
+
+      - name: Build Recovery
+        run: |
+          cd twrp
+          export ALLOW_MISSING_DEPENDENCIES=true
+          source build/envsetup.sh
+          lunch twrp_Infinix-X6525-eng
+          mka recoveryimage
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TWRP-Smart8
+          path: twrp/out/target/product/Infinix-X6525/recovery.img
